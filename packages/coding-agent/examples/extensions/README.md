@@ -87,6 +87,12 @@ cp permission-gate.ts ~/.pi/agent/extensions/
 | `git-checkpoint.ts` | Creates git stash checkpoints at each turn for code restoration on fork |
 | `auto-commit-on-exit.ts` | Auto-commits on exit using last assistant message for commit message |
 
+### Knowledge Management
+
+| Extension | Description |
+|-----------|-------------|
+| `knowly-sync.ts` | One-shot `pi --knowly` flag: exports the latest session as Markdown (parentId event-sourcing replay) and uploads it to a knowledge base via multipart HTTP. Demonstrates optional-value flags, `session_start` startup actions, and the one-shot exit pattern |
+
 ### System Prompt & Compaction
 
 | Extension | Description |
