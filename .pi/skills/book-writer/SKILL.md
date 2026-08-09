@@ -55,22 +55,56 @@ book-projects/<书名>/
 
 ### 4.1 多路并行检索
 
-本环境无内置 search 工具，用 bash + curl 联网检索。以下通道已实测可用（2026 实测，Bing/Baidu 被反爬拦截不可用）：
+本环境无内置 search 工具，用 bash + curl 联网检索。以下通道均为本机实测可用（无 key 限制）；Bing/Baidu/Google Books/SearXNG 公共实例实测被挡或配额耗尽，不可用：
 
 ```bash
-# 1) DuckDuckGo HTML（主通道，无需 API key；<URL编码主题> 用 python3 -c 或 jq 编码）
+# ── 通用网页搜索 ──────────────────────────────
+# 1) DuckDuckGo HTML（主通道，无需 API key；<URL编码主题> 用 python3 编码）
 curl -sL -m 10 -A "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36" \
   "https://html.duckduckgo.com/html/?q=<URL编码主题>"
 # 2) DuckDuckGo Lite（备选，更轻量）
 curl -sL -m 10 -A "Mozilla/5.0" "https://lite.duckduckgo.com/lite/?q=<URL编码主题>"
-# 3) Wikipedia API（权威百科，返回 JSON，可拉全文摘要）
+# 3) DDG Instant Answer API（返回 JSON，适合百科类即时回答，但常见查询为空）
+curl -sL -m 8 "https://api.duckduckgo.com/?q=<URL编码主题>&format=json"
+
+# ── 模型内置联网搜索（服务端执行，最省事，推荐） ───────
+# 用 deepseek-v4-flash 的 Responses API，web_search 工具由服务端执行，
+# 返回基于真实搜索结果生成的答案。当前可用的两个端点（均已实测）：
+#   A) opencode-go 当前端点（key 在 ~/.pi/agent/auth.json 的 opencode-go 条目）
+#      https://opencode.ai/zen/go/v1/responses
+#   B) DeepSeek 官方（env DEEPSEEK_API_KEY）
+#      https://api.deepseek.com/responses
+# 请求模板（key 换成对应端点的；可用 python3 脚本调用并把结果存 materials/）：
+curl -sL -m 120 "https://opencode.ai/zen/go/v1/responses" \
+  -H "Authorization: Bearer <opencode-go-key>" -H "Content-Type: application/json" \
+  -d '{"model":"deepseek-v4-flash","input":"搜索：<中文问题>，请给出要点和来源","tools":[{"type":"web_search_2025_08_26"}],"max_output_tokens":2000}'
+# 响应中 type=web_search_call 的 item 即服务端搜索执行记录；
+# 最终 message 的 output_text 是搜索加持后的答案。
+
+# ── 权威百科（拉全文，最可靠） ──────────────────
+# 4) Wikipedia API（返回 JSON，可拉纯文本全文）
+curl -sL -m 15 "https://zh.wikipedia.org/w/api.php?action=query&prop=extracts&explaintext=1&format=json&titles=<URL编码词条>"
+# 5) Wikipedia REST 摘要（更轻量）
+curl -sL -m 8 "https://zh.wikipedia.org/api/rest_v1/page/summary/<URL编码词条>"
+# 6) Wikipedia 搜索（不确定词条名时先用它找标题）
 curl -sL -m 10 "https://zh.wikipedia.org/w/api.php?action=query&list=search&srsearch=<URL编码主题>&format=json&srlimit=10"
-# 4) 已知资料 URL 直接抓取（官网 / 文档 / 论文页）
-curl -sL -m 15 "https://具体URL"
+
+# ── 技术主题（代码/讨论/问答） ──────────────────
+# 7) GitHub Search API（10 次/分，无需 key）
+curl -sL -m 10 -H "Accept: application/vnd.github+json" \
+  "https://api.github.com/search/repositories?q=<URL编码主题>&per_page=5"
+# 8) Hacker News Algolia（技术社区讨论）
+curl -sL -m 10 "https://hn.algolia.com/api/v1/search?query=<URL编码主题>&hitsPerPage=5"
+# 9) Stack Exchange API（Stack Overflow 等技术问答）
+curl -sL -m 10 "https://api.stackexchange.com/2.3/search/advanced?site=stackoverflow&q=<URL编码主题>&pagesize=5"
+
+# ── 学术论文 ──────────────────────────────────
+# 10) Crossref API（论文元数据，无 key）
+curl -sL -m 10 "https://api.crossref.org/works?query=<URL编码主题>&rows=5"
 ```
 
 URL 编码可用：`python3 -c "import urllib.parse,sys;print(urllib.parse.quote(sys.argv[1]))" "主题词"`。
-DDG 结果页里 `class="result__a" href="//duckduckgo.com/l/?uddg=<URL编码目标>"` 即为真实链接，解析后用第 4 条抓正文。
+DDG 结果页里 `class="result__a" href="//duckduckgo.com/l/?uddg=<URL编码目标>"` 即为真实链接，解析后用已知 URL 直接抓正文。
 
 网络不可用时，直接用模型知识撰写资料，并在 `_decision_log.md` 标注"资料来自模型知识，未经联网核实"。
 
