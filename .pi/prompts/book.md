@@ -14,5 +14,6 @@ argument-hint: "<主题一句话 | 大纲文件路径>"
    - 若输入是一个存在的文件路径（用 `bash test -f "<输入>"` 判断）→ 先 read 该大纲文件，进入"分支 B · 给定大纲"。
    - 否则 → 把输入当主题描述，进入"分支 A · 自决大纲"。
 3. 创建项目目录 `book-projects/<书名>/`，按技能七阶段流水线执行：搜资料 → BRIEF.md → OUTLINE.md → 分章撰写（每章 8000-10000 字）→ 标点体检 → 整合 `_COMPLETE_BOOK.md`。
-4. 全程在 `_decision_log.md` 记录 AI 决策；每章写完立即跑 `scripts/punctuation_check.py`。
-5. 完成后终端汇报：项目目录、章节数、总字数、`_COMPLETE_BOOK.md` 路径。
+4. **每章必须包含至少一个"人文锚点"**（题材无关）：具体的人（优先）或具体物件/场景/案例，配一个可触摸细节与一段直接引语；真实信息标注来源，素材不足时文学化重构并声明。
+5. 全程在 `_decision_log.md` 记录 AI 决策（含每章人文锚点来源）；每章写完立即跑 `scripts/punctuation_check.py`。
+6. 完成后终端汇报：项目目录、章节数、总字数、`_COMPLETE_BOOK.md` 路径。
