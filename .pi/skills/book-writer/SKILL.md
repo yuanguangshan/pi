@@ -226,6 +226,15 @@ python3 .pi/skills/book-writer/scripts/punctuation_check.py chapters/chXX_标题
 - 写完一章即落盘 `chapters/`（本地即持久化，任何时刻进度已保存）。
 - 章节定稿后不再原地修改；重写走 `chXX_标题_v2.md`。
 - 可选 git 备份：仅当用户明确要求时，只 `git add book-projects/<书名>/` 并 commit（遵循仓库提交规则）。
+- 可选 Knowly 异机备份（**自动探测，通才执行，不通不阻塞**）：
+
+```bash
+python3 .pi/skills/book-writer/scripts/backup_knowly.py \
+  chapters/ch01_标题.md chapters/ch02_标题.md ...
+python3 .pi/skills/book-writer/scripts/backup_knowly.py _COMPLETE_BOOK.md 序言.md
+```
+
+  凭证从 `~/.pi/agent/auth.json` 的 `knowly` 条目（`{"url":..., "basic_auth":...}`）或环境变量 `KNOWLY_BASIC_AUTH` / `KNOWLY_UPLOAD_URL` 读取，不入库。未配置或上传失败只记录、不打断写作。
 
 ## 九、Phase 6 序言 + 整合
 
@@ -244,7 +253,18 @@ python3 .pi/skills/book-writer/scripts/integrate_book.py \
 
 ## 十、Phase 7 汇报
 
-终端汇报：产物路径、章节数、总字数（`chapter_wordcount.py chapters/`）。若环境配置了通知渠道才推送，否则跳过（不阻塞）。
+终端汇报：产物路径、章节数、总字数（`chapter_wordcount.py chapters/`）。
+
+可选微信通知（**自动探测，通才执行，不通不阻塞**）：
+
+```bash
+TOTAL=$(python3 .pi/skills/book-writer/scripts/chapter_wordcount.py chapters/ | grep 中文字符 | sed 's/[^0-9]//g' | awk '{s+=$1} END {print s}')
+python3 .pi/skills/book-writer/scripts/notify_wechat.py \
+  --book-name <书名> --chapters 4 --total-words "$TOTAL" \
+  --complete-book-path book-projects/<书名>/_COMPLETE_BOOK.md
+```
+
+  凭证从 `~/.pi/agent/auth.json` 的 `wechat-push` 条目（`{"url":..., "token":...}`）或环境变量 `WECHAT_PUSH_URL` / `WECHAT_PUSH_TOKEN` 读取，不入库。未配置或通知失败不阻塞。
 
 ## 十一、异常分支（何时打扰用户）
 
@@ -278,7 +298,10 @@ book-writer/
 └── scripts/
     ├── punctuation_check.py   # 标点六项体检（纯 stdlib）
     ├── chapter_wordcount.py   # 中文字数统计
-    └── integrate_book.py      # 序言 + 章节整合为完整书稿
+    ├── integrate_book.py      # 序言 + 章节整合为完整书稿
+    ├── search_model.py        # 模型内置联网搜索（deepseek-v4-flash Responses API）
+    ├── backup_knowly.py       # Knowly NAS 异机备份（可选，通才执行）
+    └── notify_wechat.py       # 微信完成通知（可选，通才执行）
 ```
 
 ## 启动一句话
