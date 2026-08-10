@@ -45,3 +45,5 @@ collect.sh
 
 # Book writing project output (local only, never committed)
 book-projects/
+
+.workbuddy/
