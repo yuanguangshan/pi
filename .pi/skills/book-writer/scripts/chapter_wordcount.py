@@ -37,8 +37,11 @@ HANZI_PATTERN = re.compile(
     r"\u3400-\u4dbf]"           # CJK 扩展 A
 )
 
-# 全角 ASCII / 全角标点（。、《》、（）、，！？「」、等）
-FULLWIDTH_PATTERN = re.compile(r"[\uff00-\uffef]")
+# 全角标点 / 全角符号（与 references/punctuation-rules.md 六项对齐）：
+#   \u3000-\u303f  CJK 符号和标点（。、 《》 「」 等，原先误归 U+FF 区而漏计）
+#   \uff00-\uffef  全角形式（（），：；！？ 及全角数字）
+#   \u2014\u2026\u201c\u201d  破折号/省略号/双引号（六项里落在一般标点区，CJK 标点区不含）
+FULLWIDTH_PATTERN = re.compile(r"[\u3000-\u303f\uff00-\uffef\u2014\u2026\u201c\u201d]")
 
 # 字数目标区间（含全角标点）与理想值
 TARGET_LOW = 8000

@@ -29,11 +29,12 @@ def parse_outline(outline_path: Path) -> list[dict]:
     格式约定:
       ## 第 N 章 [标题]
       ## 第 N 章: [标题]
+      ## 第 N 章：[标题]   （全角冒号）
     """
     text = outline_path.read_text(encoding="utf-8")
     chapters = []
     for line in text.splitlines():
-        m = re.match(r"^#{1,3}\s*第\s*(\d+)\s*章\s*[::\s]\s*(.+?)\s*$", line)
+        m = re.match(r"^#{1,3}\s*第\s*(\d+)\s*章\s*[:：\s]\s*(.+?)\s*$", line)
         if m:
             chapters.append({
                 "num": int(m.group(1)),
