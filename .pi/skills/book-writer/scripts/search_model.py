@@ -3,8 +3,13 @@
 search_model.py — 用 deepseek-v4-flash 的 Responses API 做服务端联网搜索
 
 模型内置 web_search 工具，由服务端执行搜索并生成答案。两个可用端点：
-  A) opencode-go（当前 pi 使用的端点）: https://opencode.ai/zen/go/v1/responses
-  B) DeepSeek 官方:                      https://api.deepseek.com/responses
+  A) opencode-go: https://opencode.ai/zen/go/v1/responses
+  B) DeepSeek 官方: https://api.deepseek.com/responses
+
+凭证自动探测（pi / hermes 等环境通吃），按优先级：
+  env OPENCODE_GO_API_KEY > ~/.hermes/.env 的 OPENCODE_GO_API_KEY
+  > env DEEPSEEK_API_KEY > ~/.hermes/.env 的 DEEPSEEK_API_KEY
+  > ~/.pi/agent/auth.json 的 opencode-go.key
 
 用法:
     python3 search_model.py "搜索：龙华寺 素斋"
@@ -18,6 +23,8 @@ search_model.py — 用 deepseek-v4-flash 的 Responses API 做服务端联网�
 import argparse
 import json
 import os
+import platform
+import re
 import sys
 import urllib.request
 
@@ -26,19 +33,56 @@ ENDPOINTS = {
     "deepseek": "https://api.deepseek.com/responses",
 }
 
+# ~/.hermes/.env 由 hermes 启动时加载进进程 env；脚本兜底直接解析文件
+ENV_FILE = os.path.expanduser("~/.hermes/.env")
+LEGACY_AUTH = os.path.expanduser("~/.pi/agent/auth.json")
+
+
+def user_agent() -> str:
+    """平台自适应 User-Agent（macOS / Linux）。"""
+    if platform.system() == "Darwin":
+        return "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"
+    return "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36"
+
+
+def _parse_env_file(path: str, key: str) -> str:
+    """从 .env 文件解析单个 KEY=value（无引号/带引号都支持）。"""
+    try:
+        with open(path, encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line or line.startswith("#") or "=" not in line:
+                    continue
+                k, _, v = line.partition("=")
+                if k.strip() == key:
+                    return v.strip().strip('"').strip("'")
+    except OSError:
+        pass
+    return ""
+
 
 def read_key() -> str:
-    """依次尝试：auth.json(opencode-go) > env DEEPSEEK_API_KEY。"""
-    auth = os.path.expanduser("~/.pi/agent/auth.json")
-    if os.path.exists(auth):
+    """依次尝试：env OPENCODE_GO_API_KEY > ~/.hermes/.env > env DEEPSEEK_API_KEY > auth.json。"""
+    for env_name in ("OPENCODE_GO_API_KEY",):
+        v = os.environ.get(env_name, "").strip()
+        if v:
+            return v
+    v = _parse_env_file(ENV_FILE, "OPENCODE_GO_API_KEY")
+    if v:
+        return v
+    v = os.environ.get("DEEPSEEK_API_KEY", "").strip()
+    if v:
+        return v
+    v = _parse_env_file(ENV_FILE, "DEEPSEEK_API_KEY")
+    if v:
+        return v
+    if os.path.exists(LEGACY_AUTH):
         try:
-            data = json.load(open(auth, encoding="utf-8"))
+            data = json.load(open(LEGACY_AUTH, encoding="utf-8"))
             if "opencode-go" in data and data["opencode-go"].get("key"):
                 return data["opencode-go"]["key"]
         except Exception:
             pass
-    if os.environ.get("DEEPSEEK_API_KEY"):
-        return os.environ["DEEPSEEK_API_KEY"]
     return ""
 
 
@@ -55,7 +99,7 @@ def search(query: str, key: str, endpoint: str, max_tokens: int) -> dict:
         headers={
             "Authorization": f"Bearer {key}",
             "Content-Type": "application/json",
-            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
+            "User-Agent": user_agent(),
         },
         method="POST",
     )
@@ -90,14 +134,14 @@ def main():
     parser.add_argument("query", help="搜索问题")
     parser.add_argument("--out", help="把答案写入文件（推荐存 materials/）")
     parser.add_argument("--endpoint", choices=list(ENDPOINTS), default="opencode",
-                        help="端点: opencode(默认, 当前pi的端点) / deepseek(官方)")
-    parser.add_argument("--key", help="API key（默认从 auth.json / 环境变量读取）")
+                        help="端点: opencode(默认) / deepseek(官方)")
+    parser.add_argument("--key", help="API key（默认自动探测：env / ~/.hermes/.env / auth.json）")
     parser.add_argument("--max-tokens", type=int, default=4000)
     args = parser.parse_args()
 
     key = args.key or read_key()
     if not key:
-        print("❌ 未找到 API key（auth.json opencode-go 条目或 DEEPSEEK_API_KEY）")
+        print("❌ 未找到 API key（env OPENCODE_GO_API_KEY / ~/.hermes/.env / DEEPSEEK_API_KEY / ~/.pi/agent/auth.json）")
         return 1
 
     print(f"查询: {args.query}")

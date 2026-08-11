@@ -78,13 +78,14 @@ def check_chinese_double_quotes(text: str) -> dict:
 
 def check_period(text: str) -> dict:
     """项 2: 中文正文不应使用 ASCII 句点。
-    启发: 前一个字符是中文时，后面的 ASCII '.' 视为违规
-    （无论后随中文、空白还是行尾；数字/英文如 3.12、v1.2 因前一字符非中文而豁免）。
+    规则: 前一个字符是中文时，后面的 ASCII '.' 一律视为违规，
+    不限于后随中文/空白/行尾（“中文.See”这种 . 后跟英文的混排也必检）。
+    数字/英文如 3.12、v1.2 因前一字符非中文而天然豁免。
     """
-    chinese_re = re.compile(r"([\u4e00-\u9fa5])(\.)(?=[\u4e00-\u9fa5\s])")
+    chinese_re = re.compile(r"([\u4e00-\u9fa5])\.")
     violations = []
     for m in chinese_re.finditer(text):
-        idx = m.start(2)  # . 在第 2 个捕获组
+        idx = m.start() + 1  # . 的位置（中文后的第一个字符）
         line_no = text[:idx].count("\n") + 1
         line_start = text.rfind("\n", 0, idx) + 1
         line_end = text.find("\n", idx)

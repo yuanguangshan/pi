@@ -39,7 +39,7 @@ book-projects/<书名>/
 |---|---|---|---|
 | 1 资料搜集 | 联网检索（curl）+ 模型知识，落盘 materials/ | materials/*.md | 覆盖度自评 ≥ 80% |
 | 2 大纲规划 | 分支 A 自决 / 分支 B 读用户文件 | OUTLINE.md | 子论点可证伪性自检通过 |
-| 3 分章撰写 | 每章 8000-10000 字，边写边自查 | chapters/chXX_标题.md | 标点六项全过 + 字数达标 |
+| 3 分章撰写 | 每章 8000-10000 字（区间惩罚制，理想 9000），边写边自查 | chapters/chXX_标题.md | 标点六项全过 + 字数达标 |
 | 4 标点体检 | 跑 scripts/punctuation_check.py 修到全过 | — | 六项全部通过 |
 | 5 落盘持久化 | 本地落盘即保存；可选 git 备份 | 文件落盘 | 无 |
 | 6 序言 + 整合 | 写序言，跑 scripts/integrate_book.py 合并 | 序言.md + _COMPLETE_BOOK.md | 总标点体检通过 |
@@ -50,12 +50,22 @@ book-projects/<书名>/
 - 阶段不跳级；决策门未过自动回退补做，不询问用户。
 - 所有 AI 决策写入 `_decision_log.md`。
 - 默认不打扰用户；仅硬阻塞（资料源全不可达、标点 3 轮无法修复、fatal 异常）才停下询问。
+- **时间预期**：半小时成书是热主题 + 模型极速输出的理想值；冷门主题资料搜集可能触发多轮补搜，单本耗时远超此值，属正常，不以速度为达标标准。
 
 ## 四、Phase 1 资料搜集 → BRIEF.md
 
 ### 4.1 多路并行检索
 
-本环境无内置 search 工具，用 bash + curl 联网检索。以下通道均为本机实测可用（无 key 限制）；Bing/Baidu/Google Books/SearXNG 公共实例实测被挡或配额耗尽，不可用：
+本环境无内置 search 工具，用 bash + curl 联网检索。以下通道均为本机实测可用（无 key 限制）；Bing/Baidu/Google Books/SearXNG 公共实例实测被挡或配额耗尽，不可用。
+
+**知乎搜索（高质量社区内容，第一优先）**：知乎社区内容质量高——真实经验、具体案例、多元观点，最适合作为书籍资料基底。通道自动探测（Mac/Linux 通吃）：优先 zhihu-cli（macOS Keychain）；CLI 不可用（如 Linux 无官方二进制）自动降级 HTTP API 直连（凭证：env `ZHIHU_ACCESS_SECRET` / `~/.pi/agent/auth.json` 的 zhihu.access_secret / Keychain）：
+
+```bash
+# 知乎站内搜索（优先通道；--out 落盘 materials/ 供后续引用）
+python3 .pi/skills/book-writer/scripts/search_zhihu.py "<搜索问题>" --count 10 --out materials/raw_xx_zhihu.md
+# 每个子主题至少一轮知乎搜索；知乎结果与通用搜索交叉印证，社区观点与官方资料并陈
+# 知乎通道失败（未配置凭证/网络）时：终端会输出 ⚠️ 降级警告，必须把"知乎通道降级"记入 _decision_log.md，不得静默跳过
+```
 
 ```bash
 # ── 通用网页搜索 ──────────────────────────────
@@ -70,7 +80,7 @@ curl -sL -m 8 "https://api.duckduckgo.com/?q=<URL编码主题>&format=json"
 # ── 模型内置联网搜索（服务端执行，最省事，推荐） ───────
 # 用 deepseek-v4-flash 的 Responses API，web_search 工具由服务端执行，
 # 返回基于真实搜索结果生成的答案。当前可用的两个端点（均已实测）：
-#   A) opencode-go 当前端点（key 在 ~/.pi/agent/auth.json 的 opencode-go 条目）
+#   A) opencode-go 当前端点（key 自动探测：env OPENCODE_GO_API_KEY / ~/.hermes/.env / DEEPSEEK_API_KEY / ~/.pi/agent/auth.json）
 #      https://opencode.ai/zen/go/v1/responses
 #   B) DeepSeek 官方（env DEEPSEEK_API_KEY）
 #      https://api.deepseek.com/responses
@@ -110,6 +120,8 @@ DDG 结果页里 `class="result__a" href="//duckduckgo.com/l/?uddg=<URL编码目
 
 ```bash
 python3 .pi/skills/book-writer/scripts/search_model.py "搜索：<主题> 人物 口述 访谈 故事 细节 从业者" --out materials/raw_xx_人物故事.md
+# 知乎同样优先：社区里的从业者自述、亲历者经历、具体案例，是人物故事素材的富矿
+python3 .pi/skills/book-writer/scripts/search_zhihu.py "<主题> 从业者 经历 案例" --count 10 --out materials/raw_xx_人物故事.md
 # 纯技术/纯理论主题改为检索从业者/历史人物/具体案例
 ```
 
@@ -141,7 +153,7 @@ materials/raw_02_<主题B>.md
 - 语气: 理性克制 / 激情 / 散文?
 - 标点规则: 中文全角（必读 references/punctuation-rules.md）
 - 章节结构: 每章[小节数]小节,每小节[字数]字,共[章数]章
-- 每章目标字数: 8000-10000（可调整）
+- 每章目标字数: 8000-10000（含全角标点；汉字感知量约 7200-9000）
 
 ## 概念词典
 - 术语1: 定义
@@ -150,6 +162,14 @@ materials/raw_02_<主题B>.md
 ## 关键事实清单（必引）
 - 事实1: [来源]
 - 事实2: [来源]
+
+## 深度挖掘候选（至少 3 个）
+
+> 以下为素材中出现的"人物/地点/物 + 主题交叉点"，须在写作中触发二级搜索展开（见 4.4），不可仅作背景资料罗列。
+
+1. [人物/地点/物] + [与该书主题的交叉点] — 预期挖掘方向：[该交叉点指向的核心问题]
+2. [人物/地点/物] + [与该书主题的交叉点] — 预期挖掘方向：[该交叉点指向的核心问题]
+3. [人物/地点/物] + [与该书主题的交叉点] — 预期挖掘方向：[该交叉点指向的核心问题]
 
 ## 资料索引
 - 素材1: materials/raw_01_主题A.md
@@ -164,6 +184,38 @@ materials/raw_02_<主题B>.md
 | ≥ 80% | 通过 | 写日志，进 Phase 2 |
 | 50%-80% | 自动补救 | 第二轮定向检索缺失维度（最多 2 轮） |
 | < 50% | 硬阻塞 | 写日志，询问用户 |
+
+### 4.4 深度挖掘触发器（通用版）
+
+> 与题材解绑，适用任何长书写作项目（历史/传记、科技史、城市文化、艺术文学、商业产业等）。规则关注"叙事深度"，不挑主题。
+
+**触发条件**（BRIEF 深度挖掘候选或写作中遇到的素材，出现以下任一模式即触发）：
+
+- **A. 关键人物 + 具体地点/机构 + 明确时间节点**：同一句话或同一段落中同时出现可辨识的关键人物（政商学艺界）、具体地点/机构名称、明确年份或时期。例："张謇、南通、1899年大生纱厂创办"、"陈寅恪、清华国学院、1925年"、"杜尚、纽约现代艺术博物馆、1913年军械库展览"。
+- **B. 多重标签人物**：人物在公开资料中具有 ≥2 种显著身份，且其中至少一种与该书主题直接相关。例："张謇：状元 + 实业家 + 教育家"、"图灵：数学家 + 密码学家 + 人工智能先驱"、"林徽因：建筑师 + 诗人 + 古建筑保护者"。
+- **C. 主题物/场所与当代意义的断裂**：素材中提到某物、某地或某机构的历史原功能（或原含义）与其当代面貌或认知形成反差，且该反差对理解主题有价值。例："填埋场 → 今天的城市公园"、"算盘 → 量子计算"、"巴黎下水道 → 旅游景点"。
+
+**二级搜索强制动作**（触发后必须立即执行——调用 search_model.py 或 search_zhihu.py，至少完成 2 轮）：
+
+```bash
+# 第 1 轮：挖掘该人物/地点/物与该书主题的功能性关联（"它为什么重要"）
+python3 .pi/skills/book-writer/scripts/search_model.py \
+  "搜索：[人物名/地点/物] [主题关键词] [贡献/影响/行业关联]" \
+  --out materials/raw_xx_深度挖掘_关联.md
+
+# 第 2 轮：追问该人物/地点/物对主题核心命题的具体支撑（"它能回答什么问题"）
+python3 .pi/skills/book-writer/scripts/search_model.py \
+  "搜索：[人物名/地点/物] [主题核心命题关键词] 案例 细节" \
+  --out materials/raw_xx_深度挖掘_细节.md
+```
+
+**撰写约束**（硬性要求，二级搜索返回后对最终书稿中该段落的处理）：
+
+- 触发点不能仅以"一笔带过"的身份出现，必须呈现其在主题叙事中的具体作用——它回答了什么问题、提供了什么视角、揭示了什么结构。
+- 段落字数不少于 150 字（不含直接引语），确保从"提及"升级为"展开"。
+- 必须包含至少一个直接引语或具体可验证的细节（数字、日期、当事人原话、当时媒体报道）。若二级搜索未找到，应在文末标注"未检索到直接引语，细节据公开事实重构"。
+
+**例外豁免**：若二级搜索确认该触发点在该书主题下无深层叙事价值，则允许降级为"背景信息"一句话处理，并在 `_decision_log.md` 中注明豁免理由。
 
 ## 五、Phase 2 大纲规划 → OUTLINE.md
 
@@ -204,8 +256,15 @@ materials/raw_02_<主题B>.md
 ```
 1. 读 BRIEF.md + OUTLINE.md 该章定位
 2. 现搜该章子主题资料（curl 一轮，命中落盘 materials/chXX_*.md）
+2.5 深度挖掘触发器（强制）：当素材命中以下任一信号时，必须立即调用 search_model.py 或 search_zhihu.py 执行二级定向搜索，不得跳过直接进入撰写；BRIEF"深度挖掘候选"列出的交叉点同样视为命中。搜索命令与撰写约束见 4.4。
+
+    | 信号类型 | 判定规则 | 示例（跨题材） |
+    |---|---|---|
+    | A. 关键人物 + 具体地点/机构 + 明确时间节点 | 同一句话或同一段落中同时出现可辨识的关键人物（政商学艺界）、具体地点/机构名称、明确年份或时期 | "张謇、南通、1899年大生纱厂创办" / "陈寅恪、清华国学院、1925年" / "杜尚、纽约现代艺术博物馆、1913年军械库展览" |
+    | B. 多重标签人物 | 人物在公开资料中具有 ≥2 种显著身份，且其中至少一种与该书主题直接相关 | "张謇：状元 + 实业家 + 教育家" / "图灵：数学家 + 密码学家 + 人工智能先驱" / "林徽因：建筑师 + 诗人 + 古建筑保护者" |
+    | C. 主题物/场所与当代意义的断裂 | 素材中提到某物、某地或某机构的历史原功能（或原含义）与其当代面貌或认知形成反差，且该反差对理解主题有价值 | "填埋场 → 今天的城市公园" / "算盘 → 量子计算" / "巴黎下水道 → 旅游景点" |
 3. 读该章相关素材 + 全局素材
-4. 撰写（目标 8000-10000 字，严格用 BRIEF 的风格/术语/标点）。**每章必须包含至少一个"人文锚点"**（题材无关的通用要求）：
+4. 撰写（目标 8000-10000 字，区间惩罚制理想值 9000；严格用 BRIEF 的风格/术语/标点）。**每章必须包含至少一个"人文锚点"**（题材无关的通用要求）：
    - 具体的人（有名有姓或可辨识的具体个体）优先；无人可写时退而求具体物件、具体场景或具体案例
    - 细节三要素：至少一个可触摸的物件、一个具体的动作、一段直接引语
    - 真实性纪律：真实人物信息必须来自 materials/ 素材并标注来源；素材不足时允许文学化重构，但须在章节内或文末声明"文学化处理，细节为艺术重构"
@@ -220,9 +279,10 @@ materials/raw_02_<主题B>.md
 | 检查项 | 通过条件 | 失败动作 |
 |---|---|---|
 | 标点六项 | 全过 | 修补，3 轮未过标"⚠️"接受 |
-| 字数 | 8000-10000 | 不足补写，超出精简 |
+| 字数 | 8000-10000（**含全角标点**；汉字数约 7200-9000 为正常感知量） | 区间惩罚制（见 chapter_wordcount.py）：不足/超出 → 补写/精简；贴边（贴近 8000/10000 边界，惩罚 ≥40）→ 充实至 8500+ 或精简至 9500- 后定稿 |
 | 子节覆盖 | 与 OUTLINE.md 对齐 | 补齐 |
 | 人文锚点 | 每章 ≥1 个具体的人/物件/场景/案例 + 真实性标注 | 缺失则补写；素材不足按"文学化处理"声明规则接受 |
+| 深度挖掘触发点 | 触发点须展开：段落 ≥150 字（不含直接引语）+ 含直接引语或可验证细节 | 未展开则补跑 4.4 二级搜索；豁免须在 _decision_log.md 注明理由 |
 
 ## 七、Phase 4 标点体检
 
@@ -242,9 +302,9 @@ python3 .pi/skills/book-writer/scripts/punctuation_check.py chapters/chXX_标题
 - 可选 Knowly 异机备份（**自动探测，通才执行，不通不阻塞**）：
 
 ```bash
-python3 .pi/skills/book-writer/scripts/backup_knowly.py \
+python3 ~/.pi/agent/scripts/knowly_upload.py \
   chapters/ch01_标题.md chapters/ch02_标题.md ...
-python3 .pi/skills/book-writer/scripts/backup_knowly.py _COMPLETE_BOOK.md 序言.md
+python3 ~/.pi/agent/scripts/knowly_upload.py _COMPLETE_BOOK.md 序言.md
 ```
 
   凭证从 `~/.pi/agent/auth.json` 的 `knowly` 条目（`{"url":..., "basic_auth":...}`）或环境变量 `KNOWLY_BASIC_AUTH` / `KNOWLY_UPLOAD_URL` 读取，不入库。未配置或上传失败只记录、不打断写作。
@@ -271,6 +331,7 @@ python3 .pi/skills/book-writer/scripts/integrate_book.py \
 可选微信通知（**自动探测，通才执行，不通不阻塞**）：
 
 ```bash
+# 总字数统计（汉字数，不含标点；“grep 中文字符”匹配双口径输出中的汉字行）
 TOTAL=$(python3 .pi/skills/book-writer/scripts/chapter_wordcount.py chapters/ | grep 中文字符 | sed 's/[^0-9]//g' | awk '{s+=$1} END {print s}')
 python3 .pi/skills/book-writer/scripts/notify_wechat.py \
   --book-name <书名> --chapters 4 --total-words "$TOTAL" \
@@ -295,6 +356,7 @@ python3 .pi/skills/book-writer/scripts/notify_wechat.py \
 3. 句末用 `。？！……`，不用英文 `.`
 4. 不混排（一句话内不混用中英文标点）
 5. 人文锚点与真实性纪律（题材无关）：每章至少一个具体的人/物件/场景/案例锚点；真实信息标注来源；素材不足的文学化重构必须显式声明，禁止把虚构人物当事实呈现
+6. 深度挖掘触发点（见 4.4）：触发点不得一笔带过，须展开其在主题叙事中的作用（≥150 字，不含直接引语；含直接引语或可验证细节）；二级搜索确认无深层价值可豁免为背景一句话，但须在 `_decision_log.md` 注明理由
 
 ## 不适用边界
 
@@ -314,7 +376,7 @@ book-writer/
     ├── chapter_wordcount.py   # 中文字数统计
     ├── integrate_book.py      # 序言 + 章节整合为完整书稿
     ├── search_model.py        # 模型内置联网搜索（deepseek-v4-flash Responses API）
-    ├── backup_knowly.py       # Knowly NAS 异机备份（可选，通才执行）
+    ├── knowly_upload.py      # Knowly NAS 异机备份（独立工具，见 ~/.pi/agent/scripts/）
     └── notify_wechat.py       # 微信完成通知（可选，通才执行）
 ```
 
