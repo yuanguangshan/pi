@@ -68,6 +68,17 @@ python3 .pi/skills/book-writer/scripts/search_zhihu.py "<搜索问题>" --count 
 ```
 
 ```bash
+# 知乎全文抓取（深化：搜索只返回摘要+链接，用本机 knowly 链路抓取知乎原文作为素材）
+# 依赖：本机 knowly 守护进程（含 knasync 提交 + Chrome 知乎扩展在线），凭证自动从 ~/.knowly/config.json 读取
+# 用法1: 单个链接直接抓
+python3 .pi/skills/book-writer/scripts/fetch_zhihu_full.py "https://www.zhihu.com/question/xxx/answer/yyy" --out materials/raw_xx_知乎全文.md
+# 用法2: 从搜索结果文件提取全部链接批量抓（每个子主题选 1-3 篇高价值回答，非必需；全文 1-3 分钟/篇）
+python3 .pi/skills/book-writer/scripts/fetch_zhihu_full.py materials/raw_xx_zhihu.md --out-dir materials/
+# 输出自动清洗：去 frontmatter、图片残留替换为 [图片 <url>]；保留标题/作者/来源（素材须标注来源）
+# 失败处理：超时/抓不到（扩展离线或页面无正文）不阻塞流水线，记入 _decision_log.md 继续其他通道
+```
+
+```bash
 # ── 通用网页搜索 ──────────────────────────────
 # 1) DuckDuckGo HTML（主通道，无需 API key；<URL编码主题> 用 python3 编码）
 curl -sL -m 10 -A "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36" \
@@ -376,7 +387,8 @@ book-writer/
     ├── chapter_wordcount.py   # 中文字数统计
     ├── integrate_book.py      # 序言 + 章节整合为完整书稿
     ├── search_model.py        # 模型内置联网搜索（deepseek-v4-flash Responses API）
-    ├── knowly_upload.py      # Knowly NAS 异机备份（独立工具，见 ~/.pi/agent/scripts/）
+    ├── search_zhihu.py        # 知乎搜索（zhihu-cli/HTTP API）
+    ├── fetch_zhihu_full.py    # 知乎全文抓取（knowly 链路，搜索深化素材）
     └── notify_wechat.py       # 微信完成通知（可选，通才执行）
 ```
 
