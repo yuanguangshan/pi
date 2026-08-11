@@ -42,6 +42,7 @@ from pathlib import Path
 
 KNOWNLY_DEFAULT = "http://127.0.0.1:8090"
 CONFIG_PATH = Path.home() / ".knowly/config.json"
+ENV_FILE = Path.home() / ".hermes/.env"
 
 URL_RE = re.compile(r"https?://[^\s\"'<>）)】\]]+")
 ZHIHU_RE = re.compile(r"https?://[\w.-]*zhihu\.com[^\s\"'<>）)】\]]*")
@@ -52,10 +53,32 @@ IMG_ACTUALSRC_RE = re.compile(r'data-actualsrc="([^"]+)"')
 IMG_SRC_RE = re.compile(r'(?i)src="([^"]+)"')
 
 
+def _env(name: str, default: str = "") -> str:
+    """环境变量优先；未设置时兜底解析 ~/.hermes/.env（hermes/pi 环境常用）。"""
+    v = os.environ.get(name, "").strip()
+    if v:
+        return v
+    try:
+        with open(ENV_FILE, encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line or line.startswith("#") or "=" not in line:
+                    continue
+                k, _, val = line.partition("=")
+                if k.strip() == name:
+                    return val.strip().strip('"').strip("'")
+    except OSError:
+        pass
+    return default
+
+
 def load_config() -> dict:
-    """从 ~/.knowly/config.json 读取 knasync 与 web.auth 配置。"""
-    cfg = {"base_url": os.environ.get("KNOWLY_BASE_URL", KNOWNLY_DEFAULT)}
+    """从环境变量 / ~/.hermes/.env / ~/.knowly/config.json 读取配置。"""
+    cfg = {"base_url": _env("KNOWLY_BASE_URL", KNOWNLY_DEFAULT)}
     if not CONFIG_PATH.exists():
+        cfg["knasync_endpoint"] = _env("ZHIHU_KNASYNC_ENDPOINT", "")
+        cfg["knasync_auth_key"] = _env("ZHIHU_KNASYNC_KEY", "")
+        cfg["basic_auth"] = _env("KNOWLY_BASIC_AUTH", "")
         return cfg
     try:
         data = json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
@@ -68,9 +91,9 @@ def load_config() -> dict:
             cfg["basic_auth"] = data["web"]["auth"]
     except Exception:
         pass
-    cfg["knasync_endpoint"] = os.environ.get("ZHIHU_KNASYNC_ENDPOINT", cfg.get("knasync_endpoint", ""))
-    cfg["knasync_auth_key"] = os.environ.get("ZHIHU_KNASYNC_KEY", cfg.get("knasync_auth_key", ""))
-    cfg["basic_auth"] = os.environ.get("KNOWLY_BASIC_AUTH", cfg.get("basic_auth", ""))
+    cfg["knasync_endpoint"] = _env("ZHIHU_KNASYNC_ENDPOINT", cfg.get("knasync_endpoint", ""))
+    cfg["knasync_auth_key"] = _env("ZHIHU_KNASYNC_KEY", cfg.get("knasync_auth_key", ""))
+    cfg["basic_auth"] = _env("KNOWLY_BASIC_AUTH", cfg.get("basic_auth", ""))
     return cfg
 
 
