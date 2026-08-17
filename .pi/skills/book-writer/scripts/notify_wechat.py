@@ -122,6 +122,10 @@ def main():
     parser.add_argument("--dry-run", action="store_true", help="只打印消息不发送")
     args = parser.parse_args()
 
+    # 规范化路径（消除目录尾斜杠拼接产生的 // ）
+    if args.complete_book_path:
+        args.complete_book_path = os.path.normpath(args.complete_book_path)
+
     msg = build_message(args.book_name, args.chapters, args.total_words,
                         args.complete_book_path, args.extra)
     print("=== 待推送微信消息 ===")

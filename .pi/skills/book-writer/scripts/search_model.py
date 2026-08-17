@@ -6,10 +6,12 @@ search_model.py — 用 deepseek-v4-flash 的 Responses API 做服务端联网�
   A) opencode-go: https://opencode.ai/zen/go/v1/responses
   B) DeepSeek 官方: https://api.deepseek.com/responses
 
-凭证自动探测（pi / hermes 等环境通吃），按优先级：
-  env OPENCODE_GO_API_KEY > ~/.hermes/.env 的 OPENCODE_GO_API_KEY
-  > env DEEPSEEK_API_KEY > ~/.hermes/.env 的 DEEPSEEK_API_KEY
-  > ~/.pi/agent/auth.json 的 opencode-go.key
+凭证按端点配对自动探测（pi / hermes 等环境通吃）：
+  opencode 端点: env OPENCODE_GO_API_KEY > ~/.hermes/.env 的 OPENCODE_GO_API_KEY
+                 > ~/.pi/agent/auth.json 的 opencode-go / opencode key
+  deepseek 端点: env DEEPSEEK_API_KEY > ~/.hermes/.env 的 DEEPSEEK_API_KEY
+                 > ~/.pi/agent/auth.json 的 deepseek key
+（key 必须与端点配对，否则服务端返回 401）
 
 用法:
     python3 search_model.py "搜索：龙华寺 素斋"
@@ -61,29 +63,47 @@ def _parse_env_file(path: str, key: str) -> str:
     return ""
 
 
-def read_key() -> str:
-    """依次尝试：env OPENCODE_GO_API_KEY > ~/.hermes/.env > env DEEPSEEK_API_KEY > auth.json。"""
-    for env_name in ("OPENCODE_GO_API_KEY",):
+def read_key(endpoint: str) -> str:
+    """按端点取配对的 key：opencode 端点只用 opencode 的 key，deepseek 端点只用 deepseek 的 key。
+
+    优先级:
+      opencode: env OPENCODE_GO_API_KEY > ~/.hermes/.env OPENCODE_GO_API_KEY
+                > auth.json opencode-go > auth.json opencode
+      deepseek: env DEEPSEEK_API_KEY > ~/.hermes/.env DEEPSEEK_API_KEY
+                > auth.json deepseek
+    避免把 DeepSeek 的 key 发到 opencode 端点导致 401。
+    """
+    def _auth_key(*names: str) -> str:
+        if not os.path.exists(LEGACY_AUTH):
+            return ""
+        try:
+            data = json.load(open(LEGACY_AUTH, encoding="utf-8"))
+            for n in names:
+                entry = data.get(n)
+                if isinstance(entry, dict) and entry.get("key"):
+                    return entry["key"]
+        except Exception:
+            pass
+        return ""
+
+    if endpoint == "deepseek":
+        v = os.environ.get("DEEPSEEK_API_KEY", "").strip()
+        if v:
+            return v
+        v = _parse_env_file(ENV_FILE, "DEEPSEEK_API_KEY")
+        if v:
+            return v
+        return _auth_key("deepseek")
+
+    # opencode（默认端点）
+    for env_name in ("OPENCODE_GO_API_KEY", "OPENCODE_API_KEY"):
         v = os.environ.get(env_name, "").strip()
         if v:
             return v
     v = _parse_env_file(ENV_FILE, "OPENCODE_GO_API_KEY")
     if v:
         return v
-    v = os.environ.get("DEEPSEEK_API_KEY", "").strip()
-    if v:
-        return v
-    v = _parse_env_file(ENV_FILE, "DEEPSEEK_API_KEY")
-    if v:
-        return v
-    if os.path.exists(LEGACY_AUTH):
-        try:
-            data = json.load(open(LEGACY_AUTH, encoding="utf-8"))
-            if "opencode-go" in data and data["opencode-go"].get("key"):
-                return data["opencode-go"]["key"]
-        except Exception:
-            pass
-    return ""
+    return _auth_key("opencode-go", "opencode")
 
 
 def search(query: str, key: str, endpoint: str, max_tokens: int) -> dict:
@@ -139,9 +159,11 @@ def main():
     parser.add_argument("--max-tokens", type=int, default=4000)
     args = parser.parse_args()
 
-    key = args.key or read_key()
+    key = args.key or read_key(args.endpoint)
     if not key:
-        print("❌ 未找到 API key（env OPENCODE_GO_API_KEY / ~/.hermes/.env / DEEPSEEK_API_KEY / ~/.pi/agent/auth.json）")
+        hint = ("OPENCODE_GO_API_KEY 或 auth.json 的 opencode-go" if args.endpoint == "opencode"
+                else "DEEPSEEK_API_KEY 或 auth.json 的 deepseek")
+        print(f"❌ 未找到 {args.endpoint} 端点对应的 API key（需设置 {hint}）")
         return 1
 
     print(f"查询: {args.query}")
