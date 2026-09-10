@@ -47,3 +47,5 @@ collect.sh
 book-projects/
 
 .workbuddy/
+__pycache__/
+*.pyc

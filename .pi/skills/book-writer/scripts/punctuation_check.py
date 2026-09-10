@@ -2,31 +2,31 @@
 """
 punctuation_check.py — 中文写作标点六项体检
 
-六项全角标点体检 = ① 双引号 “” 配对 ② 句号 。（非 .） ③ 顿号 、（非 ,）
-                 ④ 书名号 《》（非 <>） ⑤ 括号 （）（非 ()） ⑥ 破折号 ——（非 --）
+源自 agent_md 实战 SOP(2026-08-06 写 Kimi K3 9.5 万字时踩坑):
+六项全角标点体检 = ① 双引号 "" 配对 ② 句号 。(非 .) ③ 顿号 、(非 ,)
+                 ④ 书名号 《》(非 <>) ⑤ 括号 （）(非 ()) ⑥ 破折号 ——(非 --)
 
-体检脚本跳过代码块 ``` ... ``` 内部，只检查正文中标点。
+体检脚本要"跳过代码块 ``` ... ``` 内部",只检查正文中标点。
 
 用法:
     python3 punctuation_check.py <md或txt文件>
-    python3 punctuation_check.py chapters/      # 目录模式，检查所有 md
+    python3 punctuation_check.py --all chapters/
 
 退出码:
     0 = 六项全过
     1 = 存在未通过项
-    2 = 参数错误
 """
 
 import re
 import sys
 from pathlib import Path
 
-# 跳过代码块: ```....``` 区域
+# 跳过代码块: ```....``` 区域,以及 4 空格缩进的代码块
 CODE_FENCE = re.compile(r"```[\s\S]*?```", re.MULTILINE)
 
 # Unicode 常量
-LDQUO = "\u201c"  # “
-RDQUO = "\u201d"  # ”
+LDQUO = "\u201c"  # "
+RDQUO = "\u201d"  # "
 FULL_STOP = "\u3002"  # 。
 IDEO_COMMA = "\u3001"  # 、 顿号
 LANGLE_BK = "\u300A"  # 《
@@ -37,21 +37,27 @@ RPAREN_FULL = "\uFF09"  # ）
 # 违规字符
 ASCII_DQUO = '"'
 ASCII_STOP = "."
-ASCII_COMMA = ","  # 仅在中文并列场景才视为违规，这里给警告级信号
+ASCII_COMMA = ","  # 仅在中文并列场景才视为违规,这里给警告级信号
 ASCII_LT = "<"
 ASCII_GT = ">"
 ASCII_LPAREN = "("
 ASCII_RPAREN = ")"
+ASCII_HYPHEN = "-"
 ASCII_DOUBLE_HYPHEN = "--"
 
 
 def remove_code_blocks(text: str) -> str:
-    """移除所有围栏代码块，只对正文体检。"""
+    """移除所有围栏代码块,只对正文体检。"""
     return CODE_FENCE.sub("", text)
 
 
+def split_paragraphs(text: str) -> list[str]:
+    """按空行分段,用于双引号配对修复。"""
+    return [p for p in re.split(r"\n\s*\n", text) if p.strip()]
+
+
 def check_chinese_double_quotes(text: str) -> dict:
-    """项 1: 中文正文不应出现 ASCII 双引号 "，全角双引号 “” 必须左右配对。"""
+    """项 1: 中文正文不应出现 ASCII 双引号 ",全角双引号 "" 必须左右配对。"""
     ascii_count = text.count(ASCII_DQUO)
     left = text.count(LDQUO)
     right = text.count(RDQUO)
@@ -59,7 +65,7 @@ def check_chinese_double_quotes(text: str) -> dict:
     if ascii_count > 0:
         violations.append({
             "line": 0,
-            "text": f"发现 ASCII 双引号 {ascii_count} 处(应为 0)，应改为中文双引号",
+            "text": f"发现 ASCII 双引号 {ascii_count} 处(应为 0),应改为中文双引号",
         })
     if left != right:
         violations.append({
@@ -77,16 +83,15 @@ def check_chinese_double_quotes(text: str) -> dict:
 
 
 def check_period(text: str) -> dict:
-    """项 2: 中文正文不应使用 ASCII 句点。
-    规则: 前一个字符是中文时，后面的 ASCII '.' 一律视为违规，
-    不限于后随中文/空白/行尾（“中文.See”这种 . 后跟英文的混排也必检）。
-    数字/英文如 3.12、v1.2 因前一字符非中文而天然豁免。
+    """项 2: 中文句末不应使用 ASCII 句点。
+    启发:前一个字符是中文时,后面的 ASCII '.' 视为违规。
     """
-    chinese_re = re.compile(r"([\u4e00-\u9fa5])\.")
+    chinese_re = re.compile(r"([\u4e00-\u9fa5])(\.)(?=\s|$|\n)")
     violations = []
     for m in chinese_re.finditer(text):
-        idx = m.start() + 1  # . 的位置（中文后的第一个字符）
+        idx = m.start(2)  # . 在第 2 个捕获组
         line_no = text[:idx].count("\n") + 1
+        # 提取所在行
         line_start = text.rfind("\n", 0, idx) + 1
         line_end = text.find("\n", idx)
         if line_end == -1:
@@ -101,7 +106,9 @@ def check_period(text: str) -> dict:
 
 
 def check_comma(text: str) -> dict:
-    """项 3: 中文并列场景的 ASCII ',' 视为违规（报警，不自动改）。"""
+    """项 3: 中文并列场景的 ASCII ',' 视为违规(报警,不自动改)。
+    启发:中文字符紧邻的 ',' 多半应改 ',' 之外的顿号、句末标点,这里仅作信号采集。
+    """
     chinese_re = re.compile(r"[\u4e00-\u9fa5],(?=[\u4e00-\u9fa5])")
     violations = []
     for m in chinese_re.finditer(text):
@@ -121,13 +128,14 @@ def check_comma(text: str) -> dict:
 
 
 def check_book_title(text: str) -> dict:
-    """项 4: 书名号《》— ASCII '<...>' 不应出现书名上下文。
-    启发: 包含中文的 <> 视为书名号违规。
+    """项 4: 书名号《》 — ASCII '<...>' 不应出现书名上下文。
+    启发:在中文字符间的 ASCII '<>' 视为违规。
     """
     pattern = re.compile(r"<([^<>]{2,40})>")
     violations = []
     for m in pattern.finditer(text):
         inner = m.group(1)
+        # 启发: 包含中文的 <> 视为书名号违规
         if re.search(r"[\u4e00-\u9fa5]", inner):
             idx = m.start()
             line_no = text[:idx].count("\n") + 1
@@ -143,9 +151,10 @@ def check_book_title(text: str) -> dict:
 
 
 def check_parens(text: str) -> dict:
-    """项 5: 中文括号应是全角 （） 而非 ASCII ()。
-    启发: 中文字符后紧跟的 ASCII '(' 或中文前紧邻的 ')' 视为违规。
+    """项 5: 中文括号应是全角 () 应替换为()。
+    启发:中文字符后紧跟的 ASCII '(' 或中文紧跟的 ')' 视为违规。
     """
+    # 单独的 () ... ()
     left_violations = list(re.finditer(r"[\u4e00-\u9fa5]\(", text))
     right_violations = list(re.finditer(r"\)[\u4e00-\u9fa5]", text))
     violations = []
@@ -165,7 +174,7 @@ def check_parens(text: str) -> dict:
 
 
 def check_em_dash(text: str) -> dict:
-    """项 6: 破折号应使用 ——（两个 em dash），不是 --（两个 hyphen）。"""
+    """项 6: 破折号应使用 ——(两个 em dash),不是 --(两个 hyphen)。"""
     pattern = re.compile(r"(?<!-)-{2}(?!-)")  # 不是更长横线的一部分
     violations = []
     for m in pattern.finditer(text):

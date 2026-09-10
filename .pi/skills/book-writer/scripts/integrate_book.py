@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-integrate_book.py — 全书整合: 序言 + 全部章节合并为 _COMPLETE_BOOK.md
+integrate_book.py — 全书整合:序言 + 全部章节合并为 _COMPLETE_BOOK.md
 
 用法:
     python3 integrate_book.py \
@@ -28,13 +28,12 @@ def parse_outline(outline_path: Path) -> list[dict]:
     """解析 OUTLINE.md,提取章节顺序 + 标题。
     格式约定:
       ## 第 N 章 [标题]
-      ## 第 N 章: [标题]
-      ## 第 N 章：[标题]   （全角冒号）
+      ## 第 N 章:[标题]
     """
     text = outline_path.read_text(encoding="utf-8")
     chapters = []
     for line in text.splitlines():
-        m = re.match(r"^#{1,3}\s*第\s*(\d+)\s*章\s*[:：\s]\s*(.+?)\s*$", line)
+        m = re.match(r"^#{1,3}\s*第\s*(\d+)\s*章\s*[::\s]\s*(.+?)\s*$", line)
         if m:
             chapters.append({
                 "num": int(m.group(1)),
@@ -49,6 +48,7 @@ def check_completion(book_dir: Path, chapters: list[dict]) -> dict:
     missing = []
     present = []
     for ch in chapters:
+        # 模糊匹配:ch01_xxx.md 或 ch1_xxx.md
         candidates = list(chapters_dir.glob(f"ch{int(ch['num']):02d}*.md")) + \
                      list(chapters_dir.glob(f"ch{ch['num']}*.md"))
         candidates = [c for c in candidates if not c.name.startswith("_")]
@@ -84,8 +84,8 @@ def integrate(book_dir: Path, preface_path: Path, outline_path: Path, output_pat
     lines = []
     lines.append(f"# 《{title}》")
     lines.append("")
-    lines.append(f"> 作者: 用户  ")
-    lines.append(f"> 完成时间: {today}")
+    lines.append(f"> 作者:广山哥  ")
+    lines.append(f"> 完成时间:{today}")
     lines.append("")
     lines.append("---")
     lines.append("")
