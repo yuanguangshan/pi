@@ -48,8 +48,10 @@ description: "中文写书工程化技能。当用户提到写书、写一本书
 广山哥写书的资料来源,**第一轮必须并行检索**;web 通道**用知乎全网搜索**(亚秒级,中文技术细节扎实)为主,命中全文用 WebFetch 抓取:
 
 ```bash
-# 知乎优先(唯一 web 通道;deepseek_search 已失效——DeepSeek 2026-09 模型更替后
-# 官方 API 无服务端 web_search,勿再作为兜底)
+# 知乎优先(亚秒级、免费,适合拿原始素材与多来源)
+# 注:原注释称"deepseek_search 已失效、勿再作为兜底"——该结论已于 2026-09-22 更正:
+# DeepSeek 官方新模型 deepseek-v4-pro 可正常服务端联网搜索(flash 档不行,且会编造日期)。
+# 写书仍以知乎为第一轮(快、免费、中文细节扎实),DeepSeek 可作需要"结论性综述"时的补充。
 bash ~/.zcode/skills/zhihu/scripts/run.sh search zhihu  --query "{主题}" --count 8   # 知乎社区内容
 bash ~/.zcode/skills/zhihu/scripts/run.sh search global --query "{主题}" --count 8   # 知乎之外全网
 # 命中链接抓全文:知乎用 fetch_zhihu_article,任意网页用 read_webpage / WebFetch
