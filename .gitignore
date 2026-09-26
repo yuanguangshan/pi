@@ -49,3 +49,5 @@ book-projects/
 .workbuddy/
 __pycache__/
 *.pyc
+
+.pi/skills/**/*.bak-*
